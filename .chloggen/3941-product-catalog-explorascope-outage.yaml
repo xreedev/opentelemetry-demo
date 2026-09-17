@@ -1,0 +1,15 @@
+change_type: bug_fix
+
+component: product-catalog
+
+note: "Stop `GetProduct` returning `INTERNAL` for the National Park Foundation Explorascope (`OLJCESPC7Z`) while the `productCatalogFailure` flag is enabled"
+
+issues: [3941]
+
+subtext: |-
+  The `productCatalogFailure` targeting rule resolves per `product_id`, so a
+  single enabled variant takes one catalog entry offline while the rest of the
+  storefront stays green. The failure surfaces as
+  `Error: Product Catalog Fail Feature Flag Enabled` on
+  `oteldemo.ProductCatalogService/GetProduct` and cascades to the frontend
+  product page, recommendations and checkout.
