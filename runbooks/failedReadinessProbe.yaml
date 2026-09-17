@@ -1,0 +1,30 @@
+flag: failedReadinessProbe
+enabled_value: "on"
+truth:
+  fault_class: error_injection
+  service: cart
+expected_signature:
+  change_point: step_change
+  metric: error_rate
+  loudest_service: cart
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "cart's gRPC health check (readinessCheck.CheckHealthAsync) reports Unhealthy('connection failed') for every check while the flag is on"
+  steps:
+    - "Set failedReadinessProbe back to off in demo.flagd.json"
+    - "Confirm cart's health check reports Healthy again"
+    - "If the orchestrator removed cart from load balancing, confirm it is re-added"
+    - "Check whether any pending requests were dropped during the unhealthy window"
+  permanent_fix: "Remove the debug branch from readinessCheck.CheckHealthAsync; it should call a real dependency check instead of a hardcoded flag"
+notes: >
+  Implemented in cart/src/services/HealthCheckService.cs:27-45. This only
+  flips the gRPC health-check response, not any request-serving code path
+  directly — whether it produces a visible traffic-facing symptom
+  (dropped connections, failover) depends on whether the surrounding
+  orchestrator (Docker Compose healthcheck vs. a real k8s readiness gate)
+  actually acts on the readiness result, which is not verified in this
+  repo. Drift (whether checkout, the likely caller of cart, would show
+  the loudest symptom instead) is genuinely uncertain here rather than
+  confidently false — flagged rather than guessed, per instructions.

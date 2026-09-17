@@ -1,0 +1,38 @@
+flag: productCatalogFailure
+enabled_value: "on"
+truth:
+  fault_class: error_injection
+  service: product-catalog
+expected_signature:
+  change_point: spike
+  metric: error_rate
+  loudest_service: frontend
+  hops_to_cause: 1
+  dependency: null
+drift: true
+reference_runbook:
+  cause: "product-catalog's GetProduct RPC returns an Internal gRPC error, gated by the flag, for a targeted product_id"
+  steps:
+    - "Set productCatalogFailure back to off in demo.flagd.json"
+    - "Confirm product-catalog's GetProduct error rate returns to baseline"
+    - "Confirm frontend's product-detail page error rate returns to baseline"
+    - "Confirm checkout/recommendation callers of GetProduct also recover"
+  permanent_fix: "Remove the checkProductFailure branch from product-catalog/main.go's GetProduct entirely"
+notes: >
+  Implemented in product-catalog/main.go:372-378 and the targeting rule
+  passed via product_id (main.go:419-421). truth.service is
+  product-catalog because that is where the flag is evaluated and the
+  error is thrown. GetProduct is called by frontend (product pages),
+  checkout, and recommendation, so frontend is set as loudest_service
+  under the "leaf service called by others" rule, but any of the other
+  callers could show comparable symptoms depending on traffic mix —
+  drift is a reasonable inference, not confirmed.
+  IMPORTANT CAVEAT: as currently configured in
+  opentelemetry-demo/src/flagd/demo.flagd.json's "targeting" block, BOTH
+  the if-true and if-false branches resolve to the "off" variant
+  (`"if": [{"==": [{"var": "product_id"}, "OLJCESPC7Z"]}, "off", "off"]`),
+  so this flag is a no-op in the current config regardless of the
+  defaultVariant or which product is requested — it cannot actually
+  trigger a failure today without editing that targeting rule (e.g.
+  changing the true-branch to "on"). This matches DETECTORS.md's
+  "test-set miss" / no observed signal for this flag.

@@ -1,0 +1,29 @@
+flag: paymentUnreachable
+enabled_value: "on"
+truth:
+  fault_class: upstream_dependency_error
+  service: checkout
+expected_signature:
+  change_point: spike
+  metric: error_rate
+  loudest_service: checkout
+  hops_to_cause: 0
+  dependency: "payment (client redirected to unreachable badAddress:50051)"
+drift: false
+reference_runbook:
+  cause: "checkout's chargeCard swaps its payment gRPC client for one pointed at the nonexistent host badAddress:50051 whenever the flag is on, so every Charge call fails to connect"
+  steps:
+    - "Set paymentUnreachable back to off in demo.flagd.json"
+    - "Confirm checkout stops constructing the badAddress:50051 client"
+    - "Confirm checkout's Charge call error rate returns to baseline"
+    - "Confirm payment's own request volume/error rate is unaffected (it never receives the calls)"
+  permanent_fix: "Remove the badAddress client-swap branch from checkout/main.go's chargeCard entirely"
+notes: >
+  Implemented entirely in checkout/main.go:567-571 — despite the flag's
+  name implying a payment-side fault, no code in the payment service
+  reads or reacts to this flag at all. truth.service is checkout because
+  that is the only service whose code changes: it builds a brand-new gRPC
+  client against "badAddress:50051" and uses it in place of the real
+  payment client. The connection failure therefore surfaces inside
+  checkout's own outbound call, with payment never seeing any impact —
+  same-service, zero-hop symptom, no drift.

@@ -1,0 +1,34 @@
+flag: kafkaQueueProblems
+enabled_value: "on"
+truth:
+  fault_class: queue_backpressure
+  service: checkout
+expected_signature:
+  change_point: step_change
+  metric: throughput
+  loudest_service: fraud-detection
+  hops_to_cause: 1
+  dependency: "kafka (broker itself is not traced in this fork)"
+drift: true
+reference_runbook:
+  cause: "checkout fires ~100 extra copies of every order message at the Kafka producer while fraud-detection's consumer sleeps 1 second per record it polls, so the queue fills faster than it drains and consumer lag grows"
+  steps:
+    - "Set kafkaQueueProblems back to off in demo.flagd.json"
+    - "Confirm checkout stops emitting the 100x message burst per order"
+    - "Confirm fraud-detection's consumer no longer sleeps per record"
+    - "Watch consumer group lag drain back to baseline"
+  permanent_fix: "Remove both the producer-side message-flooding loop in checkout and the consumer-side artificial sleep in fraud-detection; they should not share this one debug flag"
+notes: >
+  Two independent code paths read the same flag key: checkout/main.go:705-715
+  overloads the Kafka producer by resending each message `ffValue` times
+  (up to 100), and fraud-detection/src/main/kotlin/frauddetection/main.kt:66-69
+  sleeps 1 second per consumed record. truth.service is set to checkout
+  because that side originates the queue-side backpressure (more messages
+  in), but fraud-detection's consumer-side slowdown independently
+  compounds it (less draining out) — this is a genuine two-sided fault
+  under one flag, not a single clean cause. loudest_service is set to
+  fraud-detection because consumer lag is the most direct observable
+  symptom of backpressure, but per DETECTORS.md Kafka itself isn't traced
+  in this fork, so no detector here actually has a signal to work with —
+  this entry's drift/loudest call is architectural inference, not an
+  empirically observed result.

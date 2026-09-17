@@ -1,0 +1,26 @@
+flag: adHighCpu
+enabled_value: "on"
+truth:
+  fault_class: resource_exhaustion
+  service: ad
+expected_signature:
+  change_point: step_change
+  metric: p99_latency
+  loudest_service: ad
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "ad service runs a busy-loop CPU burn (CPULoad.execute) on every getAds call while the flag is on, starving the JVM's request-handling threads"
+  steps:
+    - "Set adHighCpu back to off in demo.flagd.json"
+    - "Watch ad service container CPU utilization return to baseline"
+    - "Confirm ad's p99 latency returns to baseline"
+    - "Restart the ad container only if CPU stays pegged after the flag flips off"
+  permanent_fix: "Remove the CPULoad debug hook from the getAds request path entirely"
+notes: >
+  Implemented in ad/src/main/java/oteldemo/AdService.java:204-205 —
+  `cpuload.execute(ffClient.getBooleanValue(AD_HIGH_CPU_FEATURE_FLAG, ...))`
+  runs unconditionally on every request, checking the flag internally.
+  Same-service, same-hop symptom: CPU pressure on the ad JVM directly
+  inflates ad's own request latency; no downstream service is involved.

@@ -1,0 +1,27 @@
+flag: adManualGc
+enabled_value: "on"
+truth:
+  fault_class: resource_exhaustion
+  service: ad
+expected_signature:
+  change_point: spike
+  metric: p99_latency
+  loudest_service: ad
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "ad service triggers a full manual GC (GarbageCollectionTrigger.doExecute) on every getAds call while the flag is on, stalling the JVM during stop-the-world collection"
+  steps:
+    - "Set adManualGc back to off in demo.flagd.json"
+    - "Watch ad service GC pause metrics / p99 latency return to baseline"
+    - "Confirm ad's error rate (timeouts) did not spike from stalled requests"
+    - "Restart the ad container if heap pressure persists after the flag flips off"
+  permanent_fix: "Remove the manual GC trigger from the getAds request path entirely"
+notes: >
+  Implemented in ad/src/main/java/oteldemo/AdService.java:242-246 — when
+  `ffClient.getBooleanValue(AD_MANUAL_GC_FEATURE_FLAG, ...)` is true, a
+  `GarbageCollectionTrigger` runs a full GC synchronously inside the RPC
+  handler on every request. Same-service, same-hop symptom: GC pause
+  latency shows up directly in ad's own p99, with no downstream service
+  involved.

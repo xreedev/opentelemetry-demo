@@ -1,0 +1,32 @@
+flag: intlShippingSlowdown
+enabled_value: "10sec"
+truth:
+  fault_class: upstream_dependency_latency
+  service: shipping
+expected_signature:
+  change_point: step_change
+  metric: p99_latency
+  loudest_service: checkout
+  hops_to_cause: 1
+  dependency: "international carrier (simulated in-process; no real external call)"
+drift: true
+reference_runbook:
+  cause: "shipping's quote/ship handler sleeps synchronously for the flag's configured number of seconds whenever the destination address is outside the US, before returning a tracking ID"
+  steps:
+    - "Set intlShippingSlowdown back to off in demo.flagd.json"
+    - "Confirm shipping's own handler latency for non-US addresses returns to baseline"
+    - "Confirm checkout's downstream call latency to shipping returns to baseline"
+    - "Check for any client-side timeouts triggered during the slow window"
+  permanent_fix: "Remove the artificial sleep from the shipping handler; if delay simulation is still wanted, model it as a mockable external-carrier client instead of an in-process sleep"
+notes: >
+  Implemented in shipping/src/shipping_service.rs:52-93. The delay is a
+  real `actix_web::rt::time::sleep` inside shipping's own request handler
+  (line 92), not a call to any external service — it simulates an
+  overseas-carrier delay without actually calling one. truth.service is
+  shipping because that is where the flag is read and the sleep happens.
+  Per the "leaf service called by others" rule, checkout (the caller of
+  shipping's order endpoint) is set as loudest_service since it experiences
+  the full added RPC round-trip latency; DETECTORS.md notes this flag was
+  missed entirely by causal-changepoint-detection ("shipping never a
+  candidate"), so this loudest-service call is inferred from the call
+  graph, not confirmed by any detector's actual output.

@@ -1,0 +1,31 @@
+flag: emailMemoryLeak
+enabled_value: "10x"
+truth:
+  fault_class: resource_exhaustion
+  service: email
+expected_signature:
+  change_point: trend_change
+  metric: p99_latency
+  loudest_service: email
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "send_email pads each confirmation email body with whitespace scaled by the flag's multiplier and, at multiplier >= 1, stops clearing the test-mailer's delivery buffer, so retained email bodies grow unbounded in the email process's memory"
+  steps:
+    - "Set emailMemoryLeak back to off in demo.flagd.json"
+    - "Restart the email service container to reclaim leaked memory"
+    - "Confirm email service memory usage (docker stats) returns to baseline"
+    - "Confirm send_email latency/error rate returns to baseline"
+  permanent_fix: "Always clear Mail::TestMailer.deliveries after each send regardless of the flag, and remove the artificial body padding"
+notes: >
+  Implemented in email/email_server.rb:61-85 — `memory_leak_multiplier`
+  pads the email body length by `(multiplier - 1)` and, per line 83-85,
+  only clears `Mail::TestMailer.deliveries` when the multiplier is < 1,
+  so at "on" values the test mailer's delivery list accumulates forever.
+  Per DETECTORS.md, the email service emits no OTel memory metric in
+  this fork, so this fault is genuinely NOT OBSERVABLE via current
+  telemetry — none of the three detectors could see it. p99_latency is
+  listed here only as a best-effort proxy (slower GC/allocation under
+  memory pressure), not a confirmed signal; treat this entry's
+  expected_signature as speculative.

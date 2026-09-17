@@ -1,0 +1,31 @@
+flag: paymentFailure
+enabled_value: "100%"
+truth:
+  fault_class: error_injection
+  service: payment
+expected_signature:
+  change_point: spike
+  metric: error_rate
+  loudest_service: checkout
+  hops_to_cause: 1
+  dependency: null
+drift: true
+reference_runbook:
+  cause: "payment's charge handler throws 'Payment request failed. Invalid token.' for a random fraction of requests, sized by the flag's numeric variant, before doing any real charge processing"
+  steps:
+    - "Set paymentFailure back to off in demo.flagd.json"
+    - "Confirm payment's own error rate returns to baseline"
+    - "Confirm checkout's Charge call error rate returns to baseline"
+    - "Confirm end-to-end PlaceOrder failures return to baseline"
+  permanent_fix: "Remove the random-failure branch from payment/charge.js entirely"
+notes: >
+  Implemented in payment/charge.js:39-47 — `numberVariant` is the flag's
+  value (0-1) and `Math.random() < numberVariant` decides failure per
+  request, before any real credit-card processing. truth.service is
+  payment because that is where the flag is read and the error is
+  thrown. checkout calls payment.Charge synchronously during PlaceOrder,
+  so its downstream error rate is set as loudest_service under the
+  "leaf service called by others" rule — DETECTORS.md corroborates
+  this shape (target payment, but caveats it as correct "via a
+  correlated feature, not error rate" for the ML classifier), though
+  probe-detector did successfully detect this on payment's own signal.

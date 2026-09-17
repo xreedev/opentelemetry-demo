@@ -1,0 +1,33 @@
+flag: imageSlowLoad
+enabled_value: "10sec"
+truth:
+  fault_class: upstream_dependency_latency
+  service: frontend
+expected_signature:
+  change_point: step_change
+  metric: p99_latency
+  loudest_service: image-provider
+  hops_to_cause: 1
+  dependency: "image-provider (via frontend-proxy's Envoy fault-delay filter)"
+drift: true
+reference_runbook:
+  cause: "frontend's ProductCard component reads the flag value and attaches it as an x-envoy-fault-delay-request header on every /images/ request; frontend-proxy's Envoy fault filter honors that header and delays the response by that many milliseconds before forwarding to image-provider"
+  steps:
+    - "Set imageSlowLoad back to off in demo.flagd.json"
+    - "Confirm the x-envoy-fault-delay-request header value returns to 0"
+    - "Confirm frontend-proxy's /images/ route latency returns to baseline"
+    - "Confirm image-provider's own request latency is unaffected (it never sees the delay)"
+  permanent_fix: "Remove the fault-delay header injection from ProductCard.tsx and the envoy.filters.http.fault filter chain from frontend-proxy's route config"
+notes: >
+  Flag read in frontend/components/ProductCard/ProductCard.tsx:32,44
+  (`useNumberFlagValue('imageSlowLoad', 0)` sets the
+  `x-envoy-fault-delay-request` header). The actual delay is injected by
+  Envoy's HTTPFault filter in frontend-proxy/envoy.tmpl.yaml:83-90, on the
+  route matching `/images/` -> image-provider (envoy.tmpl.yaml:57-58).
+  truth.service is set to frontend because that is where the flag value
+  is evaluated in application code, but the delay itself never touches
+  image-provider's own processing time — it is injected by the proxy in
+  front of it. DETECTORS.md flags this same ambiguity ("image-provider
+  may be a better target") and notes probe-detector missed this fault
+  entirely (flagged recommendation instead), so this entry's drift/loudest
+  call is a call-graph inference, not an empirically confirmed one.

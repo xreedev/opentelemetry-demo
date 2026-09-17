@@ -1,0 +1,34 @@
+flag: recommendationCacheFailure
+enabled_value: "on"
+truth:
+  fault_class: resource_exhaustion
+  service: recommendation
+expected_signature:
+  change_point: trend_change
+  metric: p99_latency
+  loudest_service: recommendation
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "get_product_list's cache-miss path appends new product IDs onto a global cached_ids list plus a duplicated quarter of it, on every miss, so the list grows without bound across requests while the flag is on"
+  steps:
+    - "Set recommendationCacheFailure back to off in demo.flagd.json"
+    - "Restart the recommendation service to reclaim the grown cached_ids list"
+    - "Confirm recommendation's per-request processing time returns to baseline"
+    - "Confirm recommendation's memory usage (docker stats) returns to baseline"
+  permanent_fix: "Remove the global cached_ids accumulation entirely; if a cache is wanted, bound its size and evict rather than append-and-duplicate"
+notes: >
+  Implemented in recommendation/recommendation_server.py:67-96. Note the
+  counterintuitive direction: with the flag OFF, get_product_list calls
+  product_catalog_stub.ListProducts on every request (no caching at
+  all); with the flag ON, it skips that call roughly half the time
+  (cache hit) but grows the shared cached_ids list by appending a fresh
+  ListProducts response plus 25% of itself on every miss — so
+  product-catalog call volume actually DECREASES while flag is on, even
+  though recommendation's own per-request payload and memory footprint
+  grow unbounded over time. truth.service and loudest_service are both
+  recommendation since the leak and its effect (slower responses from
+  ever-larger id lists) are entirely local to that process; p99_latency
+  is used as the best available proxy metric since there is no direct
+  memory metric in the taxonomy's example list.

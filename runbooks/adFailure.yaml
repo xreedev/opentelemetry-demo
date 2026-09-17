@@ -1,0 +1,28 @@
+flag: adFailure
+enabled_value: "on"
+truth:
+  fault_class: error_injection
+  service: ad
+expected_signature:
+  change_point: spike
+  metric: error_rate
+  loudest_service: ad
+  hops_to_cause: 0
+  dependency: null
+drift: false
+reference_runbook:
+  cause: "ad service's getAds RPC handler throws a gRPC UNAVAILABLE error for ~10% of requests when the flag is on"
+  steps:
+    - "Set adFailure back to off in demo.flagd.json"
+    - "Confirm flagd hot-reloaded the config (watch flagd logs)"
+    - "Check ad service error_rate returns to baseline"
+    - "Check frontend's client-side ad-request error rate returns to baseline"
+  permanent_fix: "Remove the debug fault-injection branch, or gate it behind a non-production build flag"
+notes: >
+  Implemented in ad/src/main/java/oteldemo/AdService.java:238-240 — the check
+  is `ffClient.getBooleanValue(AD_FAILURE, false, evaluationContext) &&
+  random.nextInt(10) == 0`, so only ~10% of requests fail even at "on".
+  The error is a gRPC status thrown and recorded on the ad service's own
+  span, so it is directly observable in ad's own error rate; frontend also
+  sees it as a client-side error on the same call, but the cause and the
+  loudest same-hop symptom are both "ad".

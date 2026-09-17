@@ -1,0 +1,32 @@
+flag: cartFailure
+enabled_value: "100%"
+truth:
+  fault_class: upstream_dependency_error
+  service: cart
+expected_signature:
+  change_point: spike
+  metric: error_rate
+  loudest_service: checkout
+  hops_to_cause: 1
+  dependency: "valkey/redis (hardcoded to unreachable badhost:1234)"
+drift: true
+reference_runbook:
+  cause: "cart's EmptyCart RPC routes to a second ValkeyCartStore instance wired to the unreachable host badhost:1234 for cartFailureRate% of calls, so the store connection fails/times out"
+  steps:
+    - "Set cartFailure back to off (or a lower % variant) in demo.flagd.json"
+    - "Confirm cart's EmptyCart error rate returns to baseline"
+    - "Confirm checkout's downstream call error rate to cart returns to baseline"
+    - "Check no connection retries are still pending against badhost:1234"
+  permanent_fix: "Remove the second badCartStore wiring pointed at badhost:1234 from Program.cs entirely"
+notes: >
+  Flag read in cart/src/services/CartService.cs:82-86 (EmptyCart only —
+  AddItem/GetCart are unaffected). The "bad" store is registered in
+  cart/src/Program.cs:63-68 as a second ValkeyCartStore pointed at
+  "badhost:1234", a host that does not exist, so the store call fails
+  or times out. truth.service is cart because that is where the flag
+  is read and the bad dependency is wired up, but the RPC is invoked by
+  checkout during checkout's cart-clearing step, so checkout's caller-side
+  error/latency is likely the loudest symptom — DETECTORS.md notes this
+  flag was missed by both other detectors (mistakenly attributed to
+  payment/quote), so this drift assessment is not empirically confirmed,
+  only inferred from the call graph.
