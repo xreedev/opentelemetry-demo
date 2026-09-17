@@ -47,6 +47,22 @@ your preferred deployment method:
 - [Docker](https://opentelemetry.io/docs/demo/docker_deployment/)
 - [Kubernetes](https://opentelemetry.io/docs/demo/kubernetes_deployment/)
 
+Once the stack is up, the storefront is available at
+<http://localhost:8080/> and the feature flag UI at
+<http://localhost:8080/feature>.
+
+## Feature flags
+
+The demo ships a set of feature flags that inject faults into individual
+services so you can watch the resulting telemetry. Flags are defined in
+[`src/flagd/demo.flagd.json`](./src/flagd/demo.flagd.json) and can be
+toggled at runtime from the flagd UI without restarting anything.
+
+Every flag defaults to `off`, so a freshly started demo is healthy until
+you turn one on. See the [feature flag
+documentation](https://opentelemetry.io/docs/demo/feature-flags/) for what
+each flag does and which scenario it is meant to reproduce.
+
 ## Documentation
 
 For detailed documentation, see [Demo Documentation][docs]. If you're curious
