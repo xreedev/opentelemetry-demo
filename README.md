@@ -68,6 +68,11 @@ globally. Flags read by the ad service use the `session.id` from baggage as
 their targeting key, so a variant can apply to one browsing session while
 other shoppers are unaffected.
 
+Not every flag is a simple on/off switch. Several resolve to a number and
+are applied as a rate, so the affected service degrades for a share of
+requests rather than all of them. Pick the variant that matches the
+signal-to-noise ratio you want in the resulting telemetry.
+
 ## Documentation
 
 For detailed documentation, see [Demo Documentation][docs]. If you're curious
