@@ -1,0 +1,14 @@
+change_type: enhancement
+
+component: product-catalog
+
+note: "Add per-product availability state to `GetProduct` and honour it in the frontend, recommendation, cart and checkout paths"
+
+issues: [3941]
+
+subtext: |-
+  Availability is resolved per `product_id` on the `GetProduct` path, alongside
+  the existing `productCatalogFailure` evaluation in `checkProductFailure`, so
+  a single listing can be marked unavailable without affecting the rest of the
+  catalog. Downstream callers now degrade to an unavailable listing instead of
+  treating an unresolved product as a fatal error for the whole request.
