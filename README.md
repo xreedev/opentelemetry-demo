@@ -63,6 +63,11 @@ you turn one on. See the [feature flag
 documentation](https://opentelemetry.io/docs/demo/feature-flags/) for what
 each flag does and which scenario it is meant to reproduce.
 
+Some flags resolve against an evaluation context rather than applying
+globally. Flags read by the ad service use the `session.id` from baggage as
+their targeting key, so a variant can apply to one browsing session while
+other shoppers are unaffected.
+
 ## Documentation
 
 For detailed documentation, see [Demo Documentation][docs]. If you're curious
