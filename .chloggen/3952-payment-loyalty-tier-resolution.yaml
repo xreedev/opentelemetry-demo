@@ -1,0 +1,14 @@
+change_type: enhancement
+
+component: payment
+
+note: "Resolve the shopper's loyalty tier from request baggage on the `charge` path instead of assigning it at random"
+
+issues: [3952]
+
+subtext: |-
+  `demo.user_context.loyalty_level` was picked at random per charge, so the
+  attribute could not be correlated across a shopper's transactions. It is now
+  resolved once from the `enduser.id` baggage entry and set on the `charge`
+  span before any outcome is decided, so every span on the charge path carries
+  the same tier.
