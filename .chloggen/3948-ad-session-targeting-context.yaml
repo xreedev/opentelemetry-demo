@@ -1,0 +1,14 @@
+change_type: enhancement
+
+component: ad
+
+note: "Build the ad targeting context from session baggage and fall back to category ads before random ads in `GetAds`"
+
+issues: [3948]
+
+subtext: |-
+  `GetAds` now assembles its evaluation context from the `session.id` and
+  `enduser.id` baggage entries once per request and reuses it for every flag
+  resolution on the path, instead of resolving each flag against a separately
+  built context. Category-targeted requests that match no ads fall back to the
+  category's parent before dropping to a random response.
